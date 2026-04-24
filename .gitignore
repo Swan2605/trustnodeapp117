@@ -1,0 +1,17 @@
+node_modules/
+.env
+logs/
+backend/uploads/
+backend/public/images/profile_*.jpg
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs and Editor settings
+*.log
+.vscode/
+.idea/
+
+# Ignore PDF test files
+*.pdf
