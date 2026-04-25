@@ -1,3 +1,4 @@
+```js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -15,71 +16,84 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-const DEFAULT_FRONTEND_ORIGIN = 'https://trustnode117-2m38g664p-suhani-jaiswals-projects.vercel.app';
-const VERCEL_PREVIEW_ORIGIN_PATTERN = /^https:\/\/trustnode117-[a-z0-9-]+-suhani-jaiswals-projects\.vercel\.app$/i;
+/* =========================
+   ✅ CORS CONFIG
+   ========================= */
 
-const normalizeOrigin = (origin = '') => String(origin || '').trim().replace(/\/+$/, '');
+const LOCALHOST_ORIGIN = 'http://localhost:3000';
+const VERCEL_PATTERN = /^https:\/\/.*\.vercel\.app$/;
 
-const configuredOrigins = String(process.env.FRONTEND_URLS || '')
-  .split(',')
-  .map((origin) => normalizeOrigin(origin))
-  .filter(Boolean);
+const normalizeOrigin = (origin = '') =>
+  String(origin || '').trim().replace(/\/+$/, '');
 
-const singleFrontendOrigin = normalizeOrigin(process.env.FRONTEND_URL || '');
-if (singleFrontendOrigin) {
-  configuredOrigins.push(singleFrontendOrigin);
-}
-
-const allowedOrigins = new Set(
-  [DEFAULT_FRONTEND_ORIGIN, ...configuredOrigins]
-    .map((origin) => normalizeOrigin(origin))
-    .filter(Boolean)
-);
+const allowedOrigins = new Set([
+  normalizeOrigin(LOCALHOST_ORIGIN)
+]);
 
 const isAllowedOrigin = (origin) => {
-  if (!origin) return true; // Non-browser clients / server-to-server calls
-
+  if (!origin) return true;
   const normalized = normalizeOrigin(origin);
   if (allowedOrigins.has(normalized)) return true;
-  if (VERCEL_PREVIEW_ORIGIN_PATTERN.test(normalized)) return true;
+  if (VERCEL_PATTERN.test(normalized)) return true;
   return false;
 };
 
-const corsOptions = {
-  origin(origin, callback) {
+app.use(cors({
+  origin: (origin, callback) => {
     if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.log("❌ Blocked by CORS:", origin);
+      callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-};
+}));
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options('*', cors());
+
+/* =========================
+   ✅ SOCKET.IO
+   ========================= */
 
 const io = new Server(server, {
   cors: {
-    origin(origin, callback) {
+    origin: (origin, callback) => {
       if (isAllowedOrigin(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        console.log("❌ Socket blocked:", origin);
+        callback(new Error("Not allowed by CORS"));
       }
     },
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  transports: ['websocket', 'polling']
 });
+
+global.io = io;
+
+/* =========================
+   ✅ MIDDLEWARE
+   ========================= */
+
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
+
+// Existing static folders
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 app.use('/public/images', express.static(path.join(__dirname, 'public/images')));
 
-// Routes
+// 🔥 FINAL FIX (IMPORTANT)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+/* =========================
+   ✅ ROUTES
+   ========================= */
+
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/privacy', require('./routes/privacyRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
@@ -91,76 +105,23 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 
-// Store io instance globally so controllers can access it
-global.io = io;
+/* =========================
+   ✅ SOCKET EVENTS
+   ========================= */
 
-// Socket.io for E2EE chat
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Join a conversation room
   socket.on('join-conversation', (userId) => {
-    const room = `chat-${userId}`;
-    socket.join(room);
-    console.log(`👤 User ${userId} joined room: ${room}`);
-    console.log(`📊 Current rooms:`, Array.from(io.sockets.adapter.rooms.keys()));
+    socket.join(`chat-${userId}`);
   });
 
-  // Typing indicator
   socket.on('typing', (data) => {
-    console.log('⌨️ Typing:', data.from, '->', data.to, data.isTyping);
-    const recipientRoom = `chat-${data.to}`;
-    io.to(recipientRoom).emit('typing', data);
+    io.to(`chat-${data.to}`).emit('typing', data);
   });
 
-  // Send message via Socket.IO (for real-time notification only, don't save again)
-  socket.on('send-message', async (data) => {
-    console.log('📨 Backend received send-message via Socket.IO:', {
-      from: data.from,
-      to: data.to,
-      _id: data._id,
-      encrypted: Boolean(data.encryptedMsg && data.encryptedAesKey && data.iv)
-    });
-
-    try {
-      // Message is already saved by REST API, just forward to recipient for real-time notification
-      // Emit to recipient's room
-      const recipientRoom = `chat-${data.to}`;
-      console.log('📤 Emitting to recipient room:', recipientRoom);
-      const room = io.sockets.adapter.rooms.get(recipientRoom);
-      console.log('📊 Recipients in room:', room ? room.size : 0);
-      io.to(recipientRoom).emit('receive-message', {
-        _id: data._id,
-        from: data.from,
-        to: data.to,
-        message: data.message || '',
-        encryptedMsg: data.encryptedMsg || '',
-        encryptedAesKey: data.encryptedAesKey || '',
-        iv: data.iv || '',
-        e2eeVersion: Number(data.e2eeVersion || 0),
-        isEncrypted: Boolean(data.encryptedMsg && data.encryptedAesKey && data.iv),
-        timestamp: data.timestamp
-      });
-
-      console.log('✅ Real-time notification sent to recipient');
-    } catch (error) {
-      console.error('❌ Socket send-message error:', error);
-      socket.emit('message-error', { msg: error.message });
-    }
-  });
-
-  // Mark messages as read
-  socket.on('mark-read', async (data) => {
-    try {
-      const Message = require('./models/Message');
-      await Message.updateMany(
-        { from: data.from, to: data.to, read: false },
-        { read: true }
-      );
-      io.emit('messages-read', { from: data.from, to: data.to });
-    } catch (error) {
-      console.error('Mark read error:', error);
-    }
+  socket.on('send-message', (data) => {
+    io.to(`chat-${data.to}`).emit('receive-message', data);
   });
 
   socket.on('disconnect', () => {
@@ -168,43 +129,46 @@ io.on('connection', (socket) => {
   });
 });
 
-// Anomaly detection middleware on all routes
+/* =========================
+   ✅ SECURITY + CLEANUP
+   ========================= */
+
 app.use('/api', require('./controllers/monitoringController').logAccess);
 app.use('/api', require('./controllers/monitoringController').checkAnomaly);
 
-// Schedule automatic cleanup of inactive accounts (no login for 90 days)
 const cron = require('node-cron');
 const { deleteInactiveUsers } = require('./utils/cleanupScheduler');
 
-// Run cleanup every day at 00:00 (midnight)
 cron.schedule('0 0 * * *', () => {
-  console.log('\n⏰ Scheduled cleanup task starting...');
+  console.log('⏰ Running cleanup...');
   deleteInactiveUsers();
 });
 
-// Also run cleanup on server start (after 5 seconds to ensure DB is connected) - non-blocking
 setTimeout(() => {
-  console.log('\n Running initial cleanup on server start...');
-  deleteInactiveUsers().catch(err => console.error('Cleanup error:', err));
+  deleteInactiveUsers().catch(err => console.error(err));
 }, 5000);
 
+/* =========================
+   ✅ SERVER START
+   ========================= */
+
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+
+server.listen(PORT, () => {
+  logger.info(`Server running on port ${PORT}`);
+});
 
 server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    logger.error(`Port ${PORT} is already in use. Stop the other process or set a different PORT.`);
-  } else {
-    logger.error('Server error:', error);
-  }
+  logger.error('Server error:', error);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
-  logger.error('Unhandled promise rejection:', reason);
+  logger.error('Unhandled rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
 });
+```
