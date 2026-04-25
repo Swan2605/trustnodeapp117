@@ -402,6 +402,7 @@ function App() {
             messageUnreadCount={unreadMessagesCount}
             isLoggedIn={isLoggedIn}
             profileName={profile?.username || 'S'}
+            profileAvatar={profile?.profile?.avatar || profile?.avatar || ''}
             profileHeadline={profile?.profile?.jobTitle || ''}
             profileLocation={profile?.profile?.location || ''}
             onLogout={handleLogout}
