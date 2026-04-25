@@ -54,6 +54,28 @@ app.use(cors({
 app.options('*', cors());
 
 /* =========================
+   🔥 IMPORTANT FIX (ADD THIS)
+   ========================= */
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (isAllowedOrigin(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
+/* =========================
    ✅ SOCKET.IO
    ========================= */
 
@@ -82,11 +104,8 @@ global.io = io;
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
 
-// Existing static folders
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 app.use('/public/images', express.static(path.join(__dirname, 'public/images')));
-
-// 🔥 FINAL FIX (IMPORTANT)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 /* =========================
@@ -170,4 +189,3 @@ process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
 });
-
