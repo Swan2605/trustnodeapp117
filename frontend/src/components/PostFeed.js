@@ -120,6 +120,40 @@ const readRecentShareRecipients = () => {
   }
 };
 
+const AvatarWithFallback = ({
+  src = '',
+  alt = 'avatar',
+  initial = 'U',
+  imageClassName = '',
+  fallbackClassName = '',
+  fallbackStyle = {}
+}) => {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
+
+  const safeInitial = (String(initial || 'U').trim().charAt(0).toUpperCase() || 'U');
+
+  if (!src || imageFailed) {
+    return (
+      <div className={fallbackClassName} style={fallbackStyle} role="img" aria-label={alt}>
+        {safeInitial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={imageClassName}
+      onError={() => setImageFailed(true)}
+    />
+  );
+};
+
 const PostFeed = ({
   profile,
   onPostCreated = () => {},
@@ -1121,9 +1155,10 @@ const PostFeed = ({
           </div>
         ) : (
           visiblePosts.map((post) => {
+            const userInitial = (post.user?.username || 'U').charAt(0).toUpperCase();
             const authorAvatar = post.user?.avatar
               ? resolveImageUrl(post.user.avatar)
-              : 'https://via.placeholder.com/48/7d4cff/ffffff?text=U';
+              : '';
             const mediaUrl = post.mediaUrl
               ? resolveAssetUrl(post.mediaUrl, token)
               : post.imageUrl
@@ -1153,7 +1188,24 @@ const PostFeed = ({
                     disabled={!canOpenAuthorProfile}
                     title={canOpenAuthorProfile ? 'View profile' : 'Profile unavailable'}
                   >
-                    <img src={authorAvatar} alt="avatar" className="avatar" />
+                    <AvatarWithFallback
+                      src={authorAvatar}
+                      alt={`${post.user?.username || 'User'} avatar`}
+                      initial={userInitial}
+                      imageClassName="avatar"
+                      fallbackClassName="avatar avatar-initial"
+                      fallbackStyle={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#1e7ae0',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '18px'
+                      }}
+                    />
                   </button>
                   <div className="post-author-meta">
                     <button
@@ -1309,11 +1361,26 @@ const PostFeed = ({
                           const commentKey = comment._id || `${post._id}-comment-${index}`;
                           const commenterAvatar = comment.user?.avatar
                             ? resolveAssetUrl(comment.user.avatar)
-                            : 'https://via.placeholder.com/32/5f4aff/ffffff?text=U';
+                            : '';
+                          const commenterInitial = (comment.user?.username || 'U').charAt(0).toUpperCase();
 
                           return (
                             <div key={commentKey} className="post-comment-item">
-                              <img src={commenterAvatar} alt="comment avatar" className="comment-avatar" />
+                              <AvatarWithFallback
+                                src={commenterAvatar}
+                                alt={`${comment.user?.username || 'User'} avatar`}
+                                initial={commenterInitial}
+                                imageClassName="comment-avatar"
+                                fallbackClassName="comment-avatar"
+                                fallbackStyle={{
+                                  display: 'grid',
+                                  placeItems: 'center',
+                                  background: '#1e7ae0',
+                                  color: '#ffffff',
+                                  fontWeight: 700,
+                                  fontSize: '13px'
+                                }}
+                              />
                               <div className="post-comment-body">
                                 <p className="post-comment-meta">
                                   <strong>{comment.user?.username || 'Unknown user'}</strong>
@@ -1411,6 +1478,8 @@ const PostFeed = ({
                       const connectionId = String(connection._id);
                       const isSelected = selectedConnectionIds.includes(connectionId);
                       const canMessage = connection.allowsMessages !== false;
+                      const connectionAvatar = resolveAssetUrl(connection.avatar);
+                      const connectionInitial = (connection.username || 'U').charAt(0).toUpperCase();
 
                       return (
                         <button
@@ -1420,10 +1489,20 @@ const PostFeed = ({
                           onClick={() => canMessage && toggleConnectionSelection(connection)}
                           disabled={sendingShare || !canMessage}
                         >
-                          <img
-                            src={resolveAssetUrl(connection.avatar) || `https://via.placeholder.com/40/7d4cff/ffffff?text=${encodeURIComponent((connection.username || 'U').charAt(0).toUpperCase())}`}
-                            alt={connection.username || 'Connection'}
-                            className="share-connection-avatar"
+                          <AvatarWithFallback
+                            src={connectionAvatar}
+                            alt={`${connection.username || 'Connection'} avatar`}
+                            initial={connectionInitial}
+                            imageClassName="share-connection-avatar"
+                            fallbackClassName="share-connection-avatar"
+                            fallbackStyle={{
+                              display: 'grid',
+                              placeItems: 'center',
+                              background: '#1e7ae0',
+                              color: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: '15px'
+                            }}
                           />
                           <div className="share-connection-details">
                             <strong>{connection.username}</strong>
