@@ -14,6 +14,7 @@ const Navbar = ({
   messageUnreadCount = 0,
   isLoggedIn = false,
   profileName = 'User',
+  profileAvatar = '',
   profileHeadline = '',
   profileLocation = '',
   onLogout = () => {}
@@ -26,6 +27,8 @@ const Navbar = ({
   const [searchStatus, setSearchStatus] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const searchWrapperRef = useRef(null);
+
   const searchWrapperRef = useRef(null);
   const profileWrapperRef = useRef(null);
 
@@ -96,6 +99,11 @@ const Navbar = ({
   };
 
   const profileInitial = (profileName || 'S').trim().charAt(0).toUpperCase() || 'S';
+  const profileAvatarUrl = profileAvatar ? resolveImageUrl(profileAvatar) : '';
+
+  useEffect(() => {
+    setProfileAvatarFailed(false);
+  }, [profileAvatarUrl]);
 
   return (
     <nav className="navbar">
@@ -190,14 +198,33 @@ const Navbar = ({
                 aria-label="Open account menu"
                 aria-expanded={showProfileMenu}
               >
-                <span className="nav-profile-placeholder">{profileInitial}</span>
+                {profileAvatarUrl && !profileAvatarFailed ? (
+                  
+                  <img
+                    src={profileAvatarUrl}
+                    alt={profileName}
+                    className="nav-profile-avatar"
+                    onError={() => setProfileAvatarFailed(true)}
+                  />
+                ) : (
+                  <span className="nav-profile-placeholder">{profileInitial}</span>
+                )}
               </button>
 
               {showProfileMenu && (
                 <div className="profile-menu-dropdown">
                   <div className="profile-menu-header">
                     <div className="profile-menu-avatar">
-                      <span className="nav-profile-placeholder">{profileInitial}</span>
+                      {profileAvatarUrl && !profileAvatarFailed ? (
+                        <img
+                          src={profileAvatarUrl}
+                          alt={profileName}
+                          className="nav-profile-avatar"
+                          onError={() => setProfileAvatarFailed(true)}
+                        />
+                      ) : (
+                        <span className="nav-profile-placeholder">{profileInitial}</span>
+                      )}
                     </div>
                     <div className="profile-menu-identity">
                       <strong>{profileName || 'User'}</strong>
