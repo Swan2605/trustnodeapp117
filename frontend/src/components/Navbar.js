@@ -27,6 +27,7 @@ const Navbar = ({
   const [searchStatus, setSearchStatus] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [profileAvatarFailed, setProfileAvatarFailed] = useState(false);
   const searchWrapperRef = useRef(null);
 
   const profileWrapperRef = useRef(null);
