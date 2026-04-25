@@ -29,7 +29,6 @@ const Navbar = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const searchWrapperRef = useRef(null);
 
-  const searchWrapperRef = useRef(null);
   const profileWrapperRef = useRef(null);
 
   useEffect(() => {
