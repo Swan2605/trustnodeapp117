@@ -1,4 +1,3 @@
-```js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -171,4 +170,4 @@ process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
 });
-```
+
